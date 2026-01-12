@@ -29,6 +29,10 @@ rm -rf /tmp/* /var/tmp/*
 echo "Installing FREE Python dependencies..."
 pip install --no-cache-dir -r requirements_free.txt
 
+# Install CPU-only PyTorch to avoid downloading CUDA/GPU wheels
+echo "Installing CPU-only PyTorch..."
+pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.2.2
+
 # Create necessary directories
 echo "Creating directories..."
 mkdir -p output temp logs videos data
