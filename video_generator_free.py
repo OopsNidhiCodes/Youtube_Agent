@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 """
-Free Video Generator Module - Memory Optimized for Render Free Tier (512MB)
-Uses gTTS and aggressive memory management
+Free Video Generator Module - WAV Format for MoviePy Compatibility
+Converts gTTS MP3 to WAV to avoid AudioFileClip issues
 """
 
 import os
 import gc
-import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
 from moviepy.video.fx.all import fadein, fadeout
 from gtts import gTTS
+from pydub import AudioSegment
 from typing import Dict, List, Optional
 from logger import get_logger
 
 logger = get_logger(__name__)
 
 class FreeVideoGenerator:
-    """Free video generator optimized for low memory"""
+    """Free video generator with MP3->WAV conversion"""
     
     def __init__(self):
         self.temp_dir = "temp"
         self.output_dir = "output"
         self._setup_directories()
-        logger.info("Free video generator initialized (memory-optimized)")
+        logger.info("Free video generator initialized (WAV format)")
     
     def _setup_directories(self):
         """Create necessary directories"""
@@ -31,33 +31,43 @@ class FreeVideoGenerator:
         os.makedirs(self.output_dir, exist_ok=True)
     
     def generate_audio(self, text: str, output_path: str) -> bool:
-        """Generate narration audio using gTTS"""
+        """Generate audio using gTTS and convert to WAV for MoviePy compatibility"""
         try:
+            # Generate MP3 with gTTS
             base, ext = os.path.splitext(output_path)
-            if ext.lower() != ".mp3":
-                output_path = base + ".mp3"
+            mp3_path = base + ".mp3"
+            wav_path = base + ".wav"
             
             tts = gTTS(text=text, lang="en", slow=False)
-            tts.save(output_path)
+            tts.save(mp3_path)
             
-            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-                logger.info(f"Audio generated: {os.path.basename(output_path)}")
-                return True
+            # Convert MP3 to WAV for MoviePy compatibility
+            if os.path.exists(mp3_path):
+                audio = AudioSegment.from_mp3(mp3_path)
+                audio.export(wav_path, format="wav")
+                
+                # Remove MP3, keep WAV
+                os.remove(mp3_path)
+                
+                if os.path.exists(wav_path) and os.path.getsize(wav_path) > 0:
+                    logger.info(f"Audio generated: {os.path.basename(wav_path)}")
+                    return True
+            
             return False
         except Exception as e:
             logger.error(f"Error generating audio: {e}")
             return False
     
-    def create_background_image(self, text: str, size: tuple = (1280, 720),  # Reduced from 1920x1080
+    def create_background_image(self, text: str, size: tuple = (1280, 720),
                               bg_color: tuple = (30, 30, 30)) -> Image.Image:
-        """Create background image with text overlay (reduced resolution to save memory)"""
+        """Create background image (720p to save memory)"""
         try:
             img = Image.new('RGB', size, bg_color)
             draw = ImageDraw.Draw(img)
             
-            # Use default font to save memory
+            # Load font
             try:
-                font_size = 40  # Reduced from 60
+                font_size = 40
                 font_paths = [
                     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
                     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
@@ -77,7 +87,7 @@ class FreeVideoGenerator:
             except:
                 font = ImageFont.load_default()
             
-            # Split text into lines
+            # Split text
             max_chars = 35
             words = text.split()
             lines = []
@@ -94,15 +104,13 @@ class FreeVideoGenerator:
             if current_line:
                 lines.append(' '.join(current_line))
             
-            # Draw text (simplified, no shadows to save memory)
+            # Draw text
             y_position = size[1] // 2 - (len(lines) * 50) // 2
             
             for line in lines:
                 bbox = draw.textbbox((0, 0), line, font=font)
                 text_width = bbox[2] - bbox[0]
                 x_position = (size[0] - text_width) // 2
-                
-                # Single text layer (no shadow)
                 draw.text((x_position, y_position), line, font=font, fill=(255, 255, 255))
                 y_position += 50
             
@@ -114,26 +122,25 @@ class FreeVideoGenerator:
     
     def create_video_segment(self, text: str, audio_path: str, duration: int, 
                            bg_color: tuple = (30, 30, 30)) -> Optional[ImageClip]:
-        """Create a video segment with aggressive memory management"""
+        """Create video segment with WAV audio"""
         try:
-            # Create and save image
+            # Create image
             img = self.create_background_image(text, bg_color=bg_color)
             temp_img_path = os.path.join(self.temp_dir, f"seg_{hash(text) % 1000}.png")
             img.save(temp_img_path, optimize=True)
-            del img  # Free memory immediately
+            del img
             gc.collect()
             
-            # Create video clip
+            # Load WAV audio (should work reliably)
             if os.path.exists(audio_path):
                 audio_clip = AudioFileClip(audio_path)
                 actual_duration = audio_clip.duration
                 video_clip = ImageClip(temp_img_path, duration=actual_duration)
                 video_clip = video_clip.set_audio(audio_clip)
-                audio_clip.close()  # Close audio immediately
             else:
                 video_clip = ImageClip(temp_img_path, duration=duration)
             
-            # Simple fade (reduced duration to save processing)
+            # Add fades
             video_clip = fadein(video_clip, 0.3)
             video_clip = fadeout(video_clip, 0.3)
             
@@ -142,25 +149,27 @@ class FreeVideoGenerator:
             
         except Exception as e:
             logger.error(f"Error creating segment: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
     
     def create_short_form_video(self, script: Dict, output_path: str, 
                               background_music: Optional[str] = None) -> bool:
-        """Create video with aggressive memory optimization"""
+        """Create video with WAV audio"""
+        video_clips = []
+        temp_audio_files = []
+        
         try:
-            logger.info("Creating video (memory-optimized)...")
+            logger.info("Creating video (WAV format)...")
             
-            video_clips = []
-            temp_audio_files = []
-            
-            # Limit segments to prevent memory issues
-            max_segments = 3  # Reduced from unlimited
+            # Limit to 3 segments
+            max_segments = 3
             segment_count = 0
             
             # Hook
             if 'hook' in script and segment_count < max_segments:
                 hook = script['hook']
-                audio_path = os.path.join(self.temp_dir, f"hook_{hash(str(hook)) % 1000}.mp3")
+                audio_path = os.path.join(self.temp_dir, f"hook_{hash(str(hook)) % 1000}.wav")
                 temp_audio_files.append(audio_path)
                 
                 if self.generate_audio(hook['text'], audio_path):
@@ -171,14 +180,13 @@ class FreeVideoGenerator:
                     if clip:
                         video_clips.append(clip)
                         segment_count += 1
-                        gc.collect()  # Force garbage collection
             
-            # Main segments (limit to 2)
-            for i, segment in enumerate(script.get('segments', [])[:2]):  # Max 2 segments
+            # Main segments (max 2)
+            for i, segment in enumerate(script.get('segments', [])[:2]):
                 if segment_count >= max_segments:
                     break
                     
-                audio_path = os.path.join(self.temp_dir, f"seg_{i}_{hash(str(segment)) % 1000}.mp3")
+                audio_path = os.path.join(self.temp_dir, f"seg_{i}_{hash(str(segment)) % 1000}.wav")
                 temp_audio_files.append(audio_path)
                 
                 if self.generate_audio(segment['text'], audio_path):
@@ -188,34 +196,34 @@ class FreeVideoGenerator:
                     if clip:
                         video_clips.append(clip)
                         segment_count += 1
-                        gc.collect()
             
-            # Combine clips
+            # Combine and export
             if video_clips:
                 logger.info(f"Combining {len(video_clips)} clips...")
                 final_video = concatenate_videoclips(video_clips, method="compose")
                 
-                # Export with lower settings to save memory
+                # Export
+                logger.info("Exporting video...")
                 final_video.write_videofile(
                     output_path,
                     fps=24,
                     codec='libx264',
                     audio_codec='aac',
-                    bitrate="500k",  # Lower bitrate
-                    temp_audiofile=os.path.join(self.temp_dir, 'temp_audio.m4a'),
-                    remove_temp=True,
-                    threads=1,  # Single thread to reduce memory
-                    logger=None
+                    bitrate="500k",
+                    preset='ultrafast',
+                    threads=1,
+                    logger=None,
+                    verbose=False
                 )
                 
                 # Cleanup
+                logger.info("Cleaning up...")
                 final_video.close()
                 for clip in video_clips:
                     try:
                         clip.close()
                     except:
                         pass
-                del video_clips
                 
                 # Remove temp files
                 for audio_file in temp_audio_files:
@@ -225,7 +233,7 @@ class FreeVideoGenerator:
                     except:
                         pass
                 
-                # Clean temp images
+                # Remove temp images
                 for f in os.listdir(self.temp_dir):
                     if f.startswith('seg_') and f.endswith('.png'):
                         try:
@@ -233,8 +241,8 @@ class FreeVideoGenerator:
                         except:
                             pass
                 
-                gc.collect()  # Final cleanup
-                logger.info(f"Video created: {output_path}")
+                gc.collect()
+                logger.info(f"✅ Video created: {output_path}")
                 return True
             else:
                 logger.error("No clips created")
@@ -244,10 +252,18 @@ class FreeVideoGenerator:
             logger.error(f"Error creating video: {e}")
             import traceback
             logger.error(traceback.format_exc())
+            
+            # Cleanup on error
+            for clip in video_clips:
+                try:
+                    clip.close()
+                except:
+                    pass
+            
             return False
     
     def generate_video_from_script(self, script: Dict, output_filename: str = None) -> Optional[str]:
-        """Main method to generate video"""
+        """Generate video from script"""
         try:
             if not output_filename:
                 output_filename = f"video_{hash(str(script)) % 1000}.mp4"
