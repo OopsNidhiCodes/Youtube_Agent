@@ -66,7 +66,7 @@ class FreeYouTubeTechAgent:
                 return None
             
             logger.info("✅ Script generated successfully")
-            logger.info(f"📝 Script preview: {script[:100]}...")
+            # logger.info(f"📝 Script preview: {script[:100]}...")
             
             # Step 3: Create video
             logger.info("🎬 Creating video...")
