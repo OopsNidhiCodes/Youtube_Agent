@@ -25,6 +25,9 @@ class FreeConfig:
     TEMP_DIR = os.getenv("TEMP_DIR", "temp")
     LOGS_DIR = os.getenv("LOGS_DIR", "logs")
     VIDEOS_DIR = os.getenv("VIDEOS_DIR", "videos")
+    # Delivery method for outputs when persistent disk isn't available
+    # Options: 'local' (default), 'transfer_sh'
+    OUTPUT_DELIVERY = os.getenv("OUTPUT_DELIVERY", "local")
     
     # Free AI model settings
     AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "microsoft/DialoGPT-medium")
@@ -128,7 +131,8 @@ class FreeConfig:
             "output": cls.OUTPUT_DIR,
             "temp": cls.TEMP_DIR,
             "logs": cls.LOGS_DIR,
-            "videos": cls.VIDEOS_DIR
+            "videos": cls.VIDEOS_DIR,
+            "delivery": cls.OUTPUT_DELIVERY
         }
 
 # Test configuration

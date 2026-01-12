@@ -19,6 +19,7 @@ from content_research_free import FreeContentResearcher
 from video_generator_free import FreeVideoGenerator
 from logger import get_logger
 from scheduler import VideoScheduler
+from free_uploader import upload_to_transfer_sh
 
 logger = get_logger(__name__)
 
@@ -91,6 +92,30 @@ class FreeYouTubeTechAgent:
             instructions_path = self.generate_upload_instructions(video_path, video_idea)
             
             logger.info(f"✅ Upload instructions created: {instructions_path}")
+
+            # Optional: deliver via transfer.sh if persistent disk is unavailable
+            delivery_method = os.getenv("OUTPUT_DELIVERY", "local").lower()
+            if delivery_method == "transfer_sh":
+                logger.info("🚚 Delivering files via transfer.sh (no disk required)...")
+                video_url = upload_to_transfer_sh(video_path)
+                instr_url = upload_to_transfer_sh(instructions_path)
+
+                # Save a small delivery manifest next to files
+                manifest = {
+                    "video_file": os.path.basename(video_path),
+                    "video_url": video_url,
+                    "instructions_file": os.path.basename(instructions_path),
+                    "instructions_url": instr_url,
+                    "created_at": datetime.now().isoformat(),
+                }
+                manifest_path = video_path.replace('.mp4', '_delivery.json')
+                with open(manifest_path, 'w', encoding='utf-8') as mf:
+                    json.dump(manifest, mf, indent=2)
+                logger.info(f"📦 Delivery manifest saved: {manifest_path}")
+                if video_url:
+                    logger.info(f"🔗 Video download URL: {video_url}")
+                if instr_url:
+                    logger.info(f"🔗 Instructions download URL: {instr_url}")
             
             # Step 5: Cleanup old files
             self._cleanup_old_files()
@@ -182,6 +207,15 @@ Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                     logger.info("🎉 VIDEO READY FOR MANUAL UPLOAD!")
                     logger.info(f"📁 Video: {video_path}")
                     logger.info(f"📋 Instructions: {instructions_path}")
+                    delivery_method = os.getenv("OUTPUT_DELIVERY", "local").lower()
+                    if delivery_method == "transfer_sh":
+                        manifest_path = video_path.replace('.mp4', '_delivery.json')
+                        if os.path.exists(manifest_path):
+                            with open(manifest_path, 'r', encoding='utf-8') as mf:
+                                manifest = json.load(mf)
+                            logger.info("🔗 Delivery URLs (no disk):")
+                            logger.info(f"   Video: {manifest.get('video_url')}")
+                            logger.info(f"   Instructions: {manifest.get('instructions_url')}")
                     logger.info("🔄 Next video will be created at the next scheduled time")
                     
                     # Clean up old files (keep last 5 videos)

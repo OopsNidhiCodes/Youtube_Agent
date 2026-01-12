@@ -96,12 +96,12 @@ Start Command: python main_free.py --mode automated
 Instance Type: Worker (NOT Web Service)
 ```
 
-### Step 3: Add FREE Disk (1 minute)
-1. Go to service settings
-2. Add Disk:
-   - **Name**: `data`
-   - **Mount Path**: `/app/data`
-   - **Size**: 1GB (FREE)
+ ### Step 3: Storage Options
+ - If your Render plan allows a persistent disk, add one:
+   - **Name**: `data`, **Mount Path**: `/app/data`, **Size**: 1GB
+ - If Render shows disk requires a paid upgrade, skip the disk and set:
+   - **Environment Variable**: `OUTPUT_DELIVERY=transfer_sh`
+   - The agent will log secure download links after each video (no disk required)
 
 ### Step 4: Environment Variables (Optional)
 Add these in Render dashboard:
@@ -127,10 +127,9 @@ python main_free.py --mode status
 - Shows video creation progress
 - Error messages and debugging info
 
-### Download Videos
-1. Render Dashboard → Shell tab
-2. Navigate to `/app/data/output/`
-3. Download videos and instructions
+ ### Download Videos
+ - With persistent disk: Render Dashboard → Shell tab → `/app/data/output/`
+ - Without disk: Copy the logged `transfer.sh` URLs (`OUTPUT_DELIVERY=transfer_sh`)
 
 ## 🎛️ Customize (Still FREE)
 

@@ -11,7 +11,7 @@
 - ✅ **Video Generation**: MoviePy + PIL + OpenCV (all free)
 - ✅ **Image Creation**: Colored backgrounds with text (no AI APIs)
 - ✅ **Deployment**: Render free tier + GitHub
-- ✅ **Storage**: Local disk (1GB free on Render)
+- ✅ **Storage**: If persistent disk isn't available on free tier, set `OUTPUT_DELIVERY=transfer_sh` to get instant download links (no disk required)
 
 ### **What You DON'T Need (Saving You $$$):**
 - ❌ **OpenAI API** ($0.002 per video) → **Replaced with FREE Hugging Face**
@@ -183,9 +183,8 @@ python main_free.py --mode status
 - Error messages and debugging
 
 ### **Download Videos:**
-- Render Dashboard → Shell tab
-- Navigate to `/app/data/output/`
-- Download videos and instructions
+- If you added a persistent disk: Render Dashboard → Shell tab → `/app/data/output/`
+- If disk requires paid upgrade: Set `OUTPUT_DELIVERY=transfer_sh` and use the logged download URLs
 
 ## 🛡️ Troubleshooting (Free)
 
