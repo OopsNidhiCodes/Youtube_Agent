@@ -15,7 +15,6 @@ imageio-ffmpeg>=0.4.9
 
 # Audio processing (free)
 gTTS>=2.4.0
-pydub>=0.25.1
 
 # Web scraping (free)
 beautifulsoup4>=4.12.0
