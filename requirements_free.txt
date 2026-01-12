@@ -1,0 +1,34 @@
+# Free alternatives for YouTube video agent
+# Core dependencies
+requests>=2.31.0
+python-dotenv>=1.0.0
+loguru>=0.7.2
+schedule>=1.2.0
+
+# Video processing (free)
+moviepy>=1.0.3
+opencv-python>=4.8.0
+
+# Audio processing (free)
+gTTS>=2.4.0
+pydub>=0.25.1
+
+# Web scraping (free)
+beautifulsoup4>=4.12.0
+feedparser>=6.0.10
+
+# Free AI alternatives
+huggingface-hub>=0.17.0
+transformers>=4.35.0
+torch>=2.0.0  # CPU version for free deployment
+
+# Image processing (free)
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# Local text-to-speech (free alternative)
+pyttsx3>=2.90
+
+# Optional: For local Stable Diffusion (if available)
+# diffusers>=0.21.0
+# accelerate>=0.24.0

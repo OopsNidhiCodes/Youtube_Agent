@@ -1,0 +1,81 @@
+services:
+  - type: worker
+    name: youtube-tech-agent-free
+    env: python
+    buildCommand: |
+      echo "Installing system dependencies..."
+      apt-get update
+      apt-get install -y ffmpeg espeak espeak-data libespeak1 libespeak-dev
+      apt-get install -y fonts-liberation fonts-dejavu-core
+      apt-get clean
+      rm -rf /var/lib/apt/lists/*
+      echo "Installing Python dependencies..."
+      pip install -r requirements_free.txt
+      echo "Creating directories..."
+      mkdir -p output temp logs videos
+      echo "Build completed!"
+    startCommand: python main_free.py --mode automated
+    envVars:
+      # Video settings (free)
+      - key: VIDEO_UPLOAD_TIME
+        value: "09:00"
+      - key: VIDEO_TOPIC
+        value: "technology"
+      - key: VIDEO_LENGTH
+        value: "60"
+      - key: UPLOAD_SCHEDULE
+        value: "daily"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      
+      # Free AI settings
+      - key: AI_MODEL_NAME
+        value: "microsoft/DialoGPT-medium"
+      - key: AI_DEVICE
+        value: "cpu"
+      - key: AI_MAX_LENGTH
+        value: "500"
+      - key: AI_TEMPERATURE
+        value: "0.7"
+      
+      # Free TTS settings
+      - key: TTS_RATE
+        value: "150"
+      - key: TTS_VOLUME
+        value: "0.9"
+      
+      # Cleanup settings
+      - key: KEEP_VIDEO_COUNT
+        value: "5"
+      - key: CLEANUP_OLD_FILES
+        value: "true"
+      
+      # Render free tier flag
+      - key: RENDER_FREE_TIER
+        value: "true"
+    
+    disk:
+      name: data
+      mountPath: /app/data
+      sizeGB: 1
+    
+    # Free tier settings
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /health
+    
+    # Resource limits for free tier
+    memory: 512Mi
+    cpu: 100m
+    
+    # Environment notes
+    envGroups: []
+    
+    # Scaling (disabled for free tier)
+    scaling:
+      minInstances: 0
+      maxInstances: 1
+      targetCPUPercent: 70
+      targetMemoryPercent: 80
