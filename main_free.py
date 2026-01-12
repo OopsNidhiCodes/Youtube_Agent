@@ -48,7 +48,7 @@ class FreeYouTubeTechAgent:
             
             # Step 1: Research trending topics (RSS feeds)
             logger.info("📰 Researching trending topics...")
-            trending_topics = self.content_researcher.get_trending_topics()
+            trending_topics = self.content_researcher.get_trending_tech_topics()
             
             if not trending_topics:
                 logger.error("❌ No trending topics found")

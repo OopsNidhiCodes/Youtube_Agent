@@ -3,15 +3,16 @@ import time
 from datetime import datetime, timedelta
 import threading
 from typing import Callable, Optional
-from config import Config
+import os
 from logger import get_logger
 
 logger = get_logger(__name__)
 
 class VideoScheduler:
     def __init__(self):
-        self.upload_time = Config.VIDEO_UPLOAD_TIME
-        self.schedule_type = Config.UPLOAD_SCHEDULE
+        # Read scheduler configuration from environment variables with sensible defaults
+        self.upload_time = os.getenv("VIDEO_UPLOAD_TIME", "09:00")
+        self.schedule_type = os.getenv("UPLOAD_SCHEDULE", "daily").lower()
         self.running = False
         self.thread = None
         logger.info(f"Scheduler initialized with {self.schedule_type} uploads at {self.upload_time}")
@@ -32,6 +33,19 @@ class VideoScheduler:
             return False
         
         return True
+
+    def schedule_daily(self, upload_function: Callable, time_str: Optional[str] = None) -> bool:
+        """Schedule a daily job at the specified time (HH:MM)."""
+        if time_str:
+            self.upload_time = time_str
+        self.schedule_type = 'daily'
+        logger.info(f"Setting up daily schedule at {self.upload_time}")
+        try:
+            schedule.every().day.at(self.upload_time).do(upload_function)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to schedule daily job: {e}")
+            return False
     
     def start(self):
         """Start the scheduler in a background thread"""
@@ -50,6 +64,10 @@ class VideoScheduler:
         if self.thread:
             self.thread.join(timeout=5)
         logger.info("Scheduler stopped")
+
+    def is_running(self) -> bool:
+        """Return whether the scheduler is currently running."""
+        return self.running
     
     def _run_scheduler(self):
         """Run the scheduler loop"""
