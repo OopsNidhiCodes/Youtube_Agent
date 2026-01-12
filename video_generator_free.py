@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import ImageClip, AudioFileClip, CompositeVideoClip, concatenate_videoclips
 from moviepy.video.fx.all import fadein, fadeout
-import pyttsx3
+from gtts import gTTS
 import tempfile
 from typing import Dict, List, Optional
 from logger import get_logger
@@ -24,7 +24,7 @@ class FreeVideoGenerator:
         self.temp_dir = "temp"
         self.output_dir = "output"
         self._setup_directories()
-        self._setup_tts_engine()
+        # gTTS requires no system TTS engine; no initialization needed
     
     def _setup_directories(self):
         """Create necessary directories"""
@@ -32,45 +32,23 @@ class FreeVideoGenerator:
         os.makedirs(self.output_dir, exist_ok=True)
     
     def _setup_tts_engine(self):
-        """Setup free text-to-speech engine"""
-        try:
-            self.tts_engine = pyttsx3.init()
-            
-            # Configure TTS settings
-            self.tts_engine.setProperty('rate', 150)  # Speed of speech
-            self.tts_engine.setProperty('volume', 0.9)  # Volume level
-            
-            # Try to use a better voice if available
-            voices = self.tts_engine.getProperty('voices')
-            if voices:
-                # Use the first available voice
-                self.tts_engine.setProperty('voice', voices[0].id)
-            
-            logger.info("Free TTS engine initialized successfully")
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize TTS engine: {e}")
-            self.tts_engine = None
+        """Deprecated: pyttsx3 setup removed; using gTTS instead."""
+        pass
     
     def generate_audio(self, text: str, output_path: str) -> bool:
-        """Generate audio using free TTS engine"""
+        """Generate narration audio using gTTS (no system TTS required)."""
         try:
-            if self.tts_engine:
-                # Save audio file
-                self.tts_engine.save_to_file(text, output_path)
-                self.tts_engine.runAndWait()
-                
-                # Verify file was created
-                if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-                    logger.info(f"Audio generated successfully: {output_path}")
-                    return True
-                else:
-                    logger.error("Audio file was not created properly")
-                    return False
-            else:
-                logger.error("TTS engine not available")
-                return False
-                
+            # Ensure MP3 extension for gTTS
+            base, ext = os.path.splitext(output_path)
+            if ext.lower() != ".mp3":
+                output_path = base + ".mp3"
+            tts = gTTS(text=text, lang="en")
+            tts.save(output_path)
+            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                logger.info(f"Audio generated successfully: {output_path}")
+                return True
+            logger.error("Audio file was not created properly")
+            return False
         except Exception as e:
             logger.error(f"Error generating audio: {e}")
             return False
@@ -239,7 +217,7 @@ class FreeVideoGenerator:
             # Generate hook segment
             if 'hook' in script:
                 hook = script['hook']
-                audio_path = os.path.join(self.temp_dir, f"hook_{hash(str(hook)) % 10000}.wav")
+                audio_path = os.path.join(self.temp_dir, f"hook_{hash(str(hook)) % 10000}.mp3")
                 temp_audio_files.append(audio_path)
                 
                 if self.generate_audio(hook['text'], audio_path):
@@ -254,7 +232,7 @@ class FreeVideoGenerator:
             
             # Generate main content segments
             for i, segment in enumerate(script.get('segments', [])):
-                audio_path = os.path.join(self.temp_dir, f"segment_{i}_{hash(str(segment)) % 10000}.wav")
+                audio_path = os.path.join(self.temp_dir, f"segment_{i}_{hash(str(segment)) % 10000}.mp3")
                 temp_audio_files.append(audio_path)
                 
                 if self.generate_audio(segment['text'], audio_path):
@@ -269,7 +247,7 @@ class FreeVideoGenerator:
             # Generate call-to-action segment
             if 'call_to_action' in script:
                 cta = script['call_to_action']
-                audio_path = os.path.join(self.temp_dir, f"cta_{hash(str(cta)) % 10000}.wav")
+                audio_path = os.path.join(self.temp_dir, f"cta_{hash(str(cta)) % 10000}.mp3")
                 temp_audio_files.append(audio_path)
                 
                 if self.generate_audio(cta['text'], audio_path):

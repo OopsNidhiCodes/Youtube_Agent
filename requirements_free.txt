@@ -8,6 +8,7 @@ schedule>=1.2.0
 # Video processing (free)
 moviepy>=1.0.3
 opencv-python>=4.8.0
+imageio-ffmpeg>=0.4.9
 
 # Audio processing (free)
 gTTS>=2.4.0
@@ -28,9 +29,6 @@ transformers>=4.35.0
 # Image processing (free)
 Pillow>=10.0.0
 numpy>=1.24.0
-
-# Local text-to-speech (free alternative)
-pyttsx3>=2.90
 
 # Optional: For local Stable Diffusion (if available)
 # diffusers>=0.21.0

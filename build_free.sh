@@ -3,27 +3,8 @@
 # Free build script for Render deployment
 echo "🆓 Starting FREE build process..."
 
-# Update package list
-echo "Updating package list..."
-apt-get update
-
-# Install essential free dependencies
-echo "Installing free system dependencies..."
-
-# FFmpeg for video processing (free)
-apt-get install -y ffmpeg
-
-# Free TTS dependencies (espeak)
-apt-get install -y espeak espeak-data libespeak1 libespeak-dev
-
-# Free fonts for image generation
-apt-get install -y fonts-liberation fonts-dejavu-core fonts-freefont-ttf
-
-# Clean up to save space
-echo "Cleaning up..."
-apt-get clean
-rm -rf /var/lib/apt/lists/*
-rm -rf /tmp/* /var/tmp/*
+# Skipping system package installs (no root on Render free tier)
+echo "Skipping system package installs; relying on Python packages only."
 
 # Install Python dependencies (free versions)
 echo "Installing FREE Python dependencies..."
@@ -31,7 +12,7 @@ pip install --no-cache-dir -r requirements_free.txt
 
 # Install CPU-only PyTorch to avoid downloading CUDA/GPU wheels
 echo "Installing CPU-only PyTorch..."
-pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.2.2
+pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch torchvision torchaudio
 
 # Create necessary directories
 echo "Creating directories..."
@@ -67,11 +48,12 @@ except Exception as e:
     print(f"❌ Video generator error: {e}")
 
 try:
-    import pyttsx3
-    engine = pyttsx3.init()
-    print("✅ Free TTS engine initialized")
+    from gtts import gTTS
+    tts = gTTS(text="Test", lang="en")
+    tts.save("/tmp/test_gtts.mp3")
+    print("✅ gTTS working and saved MP3")
 except Exception as e:
-    print(f"❌ TTS error: {e}")
+    print(f"❌ gTTS error: {e}")
 
 print("🎉 Free build test completed!")
 EOF
