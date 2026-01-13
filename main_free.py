@@ -19,12 +19,17 @@ from content_research_free import FreeContentResearcher
 from video_generator_free import FreeVideoGenerator
 from logger import get_logger
 from scheduler import VideoScheduler
+
+# Initialize logger first
+logger = get_logger(__name__)
+
+# Try to import email delivery (optional)
 try:
     from email_delivery import send_video_email
     EMAIL_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     EMAIL_AVAILABLE = False
-    logger.warning("Email delivery not available")
+    logger.warning(f"Email delivery not available: {e}")
 
 def upload_to_transfer_sh(file_path: str, max_days: int = 14) -> str:
     """Upload with multiple fallback options"""
@@ -73,7 +78,6 @@ def upload_to_transfer_sh(file_path: str, max_days: int = 14) -> str:
     
     logger.error("All upload services failed")
     return None
-logger = get_logger(__name__)
 
 class FreeYouTubeTechAgent:
     """Free YouTube video agent using only free resources"""
@@ -118,7 +122,6 @@ class FreeYouTubeTechAgent:
                 return None
             
             logger.info("✅ Script generated successfully")
-            # logger.info(f"📝 Script preview: {script[:100]}...")
             
             # Step 3: Create video
             logger.info("🎬 Creating video...")
@@ -151,11 +154,15 @@ class FreeYouTubeTechAgent:
             if delivery_method == "email":
                 logger.info("📧 Delivering files via email...")
                 if EMAIL_AVAILABLE:
-                    if send_video_email(video_path, instructions_path):
-                        logger.info("✅ Email sent successfully!")
-                        logger.info("📬 Check your inbox for the video!")
-                    else:
-                        logger.error("❌ Email delivery failed")
+                    try:
+                        if send_video_email(video_path, instructions_path):
+                            logger.info("✅ Email sent successfully!")
+                            logger.info("📬 Check your inbox for the video!")
+                        else:
+                            logger.error("❌ Email delivery failed")
+                            logger.warning("💡 Video saved locally, check output folder")
+                    except Exception as e:
+                        logger.error(f"Email error: {e}")
                         logger.warning("💡 Video saved locally, check output folder")
                 else:
                     logger.error("❌ Email delivery not configured")
@@ -218,18 +225,11 @@ class FreeYouTubeTechAgent:
 
 📝 **Title:** {metadata.get('topic', 'Tech Video')}
 
-📝 **Description:**
-{metadata.get('description', 'Check out this tech video!')}
+📖 **Description:**
+{metadata.get('description', 'Tech video about ' + metadata.get('topic', 'technology'))}
 
-🏷️ **Tags:** {', '.join(metadata.get('tags', []))}
-
-🔍 **Keywords:** {', '.join(metadata.get('keywords', []))}
-
-⚙️ **UPLOAD SETTINGS:**
-- **Visibility:** Public (or schedule as desired)
-- **Category:** Science & Technology
-- **Made for kids:** No
-- **License:** Standard YouTube License
+🏷️ **Tags:**
+{', '.join(metadata.get('tags', []))}
 
 ⏰ **SCHEDULE RECOMMENDATION:**
 Upload at 9:00 AM for best engagement
@@ -266,31 +266,23 @@ Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                 video_path = self.create_video()
                 
                 if video_path:
-                    # Load metadata
-                    metadata_path = video_path.replace('.mp4', '_metadata.json')
-                    with open(metadata_path, 'r', encoding='utf-8') as f:
-                        metadata = json.load(f)
-                    
-                    # Generate upload instructions
-                    instructions_path = self.generate_upload_instructions(video_path, metadata)
-                    
-                    logger.info("🎉 VIDEO READY FOR MANUAL UPLOAD!")
+                    logger.info("🎉 VIDEO READY!")
                     logger.info(f"📁 Video: {video_path}")
-                    logger.info(f"📋 Instructions: {instructions_path}")
+                    
                     delivery_method = os.getenv("OUTPUT_DELIVERY", "local").lower()
-                    if delivery_method == "transfer_sh":
+                    if delivery_method == "email":
+                        logger.info("📧 Video emailed to you!")
+                    elif delivery_method == "transfer_sh":
                         manifest_path = video_path.replace('.mp4', '_delivery.json')
                         if os.path.exists(manifest_path):
                             with open(manifest_path, 'r', encoding='utf-8') as mf:
                                 manifest = json.load(mf)
-                            logger.info("🔗 Delivery URLs (no disk):")
+                            logger.info("🔗 Delivery URLs:")
                             logger.info(f"   Video: {manifest.get('video_url')}")
                             logger.info(f"   Instructions: {manifest.get('instructions_url')}")
+                    
                     logger.info("🔄 Next video will be created at the next scheduled time")
-                    
-                    # Clean up old files (keep last 5 videos)
                     self._cleanup_old_files()
-                    
                 else:
                     logger.error("Failed to create video")
                     
@@ -321,24 +313,19 @@ Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
     def _cleanup_old_files(self, keep_count: int = 5):
         """Clean up old video files to save space"""
         try:
-            # Get all video files
             video_files = []
             for ext in ['*.mp4', '*.avi', '*.mov']:
                 video_files.extend(Path(self.output_dir).glob(ext))
             
-            # Sort by modification time
             video_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
             
-            # Remove old files
             if len(video_files) > keep_count:
                 for old_file in video_files[keep_count:]:
                     old_file.unlink()
-                    # Also remove metadata and instructions
                     for suffix in ['.json', '_metadata.json', '_upload_instructions.txt']:
                         meta_file = old_file.with_suffix(suffix)
                         if meta_file.exists():
                             meta_file.unlink()
-                    
                     logger.info(f"Cleaned up old file: {old_file}")
                     
         except Exception as e:
@@ -376,29 +363,15 @@ def main():
     agent = FreeYouTubeTechAgent()
     
     if args.mode == "create":
-        # Create single video
         video_path = agent.create_video(args.topic, args.length)
         if video_path:
-            # Load metadata and generate instructions
-            metadata_path = video_path.replace('.mp4', '_metadata.json')
-            with open(metadata_path, 'r', encoding='utf-8') as f:
-                metadata = json.load(f)
-            
-            instructions_path = agent.generate_upload_instructions(video_path, metadata)
-            
             print(f"\n🎉 VIDEO CREATED SUCCESSFULLY!")
             print(f"📁 Video file: {video_path}")
-            print(f"📋 Upload instructions: {instructions_path}")
-            print("\n🔄 Next steps:")
-            print("1. Read the upload instructions file")
-            print("2. Manually upload to YouTube Studio")
-            print("3. Use the provided title, description, and tags")
         else:
             print("❌ Failed to create video")
             sys.exit(1)
     
     elif args.mode == "automated":
-        # Run automated mode
         print("🚀 Starting FREE automated YouTube video agent...")
         print("This version creates videos but requires manual upload to YouTube.")
         print("Check the output folder for new videos and upload instructions.")
@@ -407,7 +380,6 @@ def main():
         agent.run_automated_mode()
     
     elif args.mode == "status":
-        # Show status
         status = agent.get_status()
         print("\n📊 FREE YOUTUBE TECH VIDEO AGENT STATUS")
         print("=" * 50)
