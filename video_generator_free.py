@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Free Video Generator Module - No pydub dependency
-Uses gTTS MP3 files directly with better error handling
+Free Video Generator - With gTTS retry logic for rate limits
 """
 
 import os
 import gc
+import time
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
 from moviepy.video.fx.all import fadein, fadeout
@@ -16,7 +16,7 @@ from logger import get_logger
 logger = get_logger(__name__)
 
 class FreeVideoGenerator:
-    """Free video generator without pydub dependency"""
+    """Free video generator with rate limit handling"""
     
     def __init__(self):
         self.temp_dir = "temp"
@@ -29,23 +29,41 @@ class FreeVideoGenerator:
         os.makedirs(self.temp_dir, exist_ok=True)
         os.makedirs(self.output_dir, exist_ok=True)
     
-    def generate_audio(self, text: str, output_path: str) -> bool:
-        """Generate audio using gTTS"""
-        try:
-            base, ext = os.path.splitext(output_path)
-            if ext.lower() != ".mp3":
-                output_path = base + ".mp3"
-            
-            tts = gTTS(text=text, lang="en", slow=False)
-            tts.save(output_path)
-            
-            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-                logger.info(f"Audio: {os.path.basename(output_path)}")
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"Audio error: {e}")
-            return False
+    def generate_audio(self, text: str, output_path: str, max_retries: int = 3) -> bool:
+        """Generate audio with retry logic for rate limits"""
+        base, ext = os.path.splitext(output_path)
+        if ext.lower() != ".mp3":
+            output_path = base + ".mp3"
+        
+        for attempt in range(max_retries):
+            try:
+                # Add delay between requests to avoid rate limits
+                if attempt > 0:
+                    wait_time = (2 ** attempt) * 2  # Exponential backoff: 4s, 8s, 16s
+                    logger.info(f"Rate limit hit, waiting {wait_time}s...")
+                    time.sleep(wait_time)
+                
+                tts = gTTS(text=text, lang="en", slow=False)
+                tts.save(output_path)
+                
+                if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                    logger.info(f"Audio: {os.path.basename(output_path)}")
+                    # Small delay to be nice to Google's API
+                    time.sleep(1)
+                    return True
+                    
+            except Exception as e:
+                error_msg = str(e)
+                if "429" in error_msg or "Too Many Requests" in error_msg:
+                    logger.warning(f"Rate limited (attempt {attempt + 1}/{max_retries})")
+                    if attempt == max_retries - 1:
+                        logger.error("Max retries reached, skipping audio")
+                        return False
+                else:
+                    logger.error(f"Audio error: {e}")
+                    return False
+        
+        return False
     
     def create_background_image(self, text: str, size: tuple = (1280, 720),
                               bg_color: tuple = (30, 30, 30)) -> Image.Image:
@@ -129,9 +147,10 @@ class FreeVideoGenerator:
                     video_clip = video_clip.set_audio(audio_clip)
                 except Exception as audio_error:
                     logger.warning(f"Audio load failed, using silent: {audio_error}")
-                    # Fallback to silent video
                     video_clip = ImageClip(temp_img_path, duration=duration)
             else:
+                # No audio file - create silent video
+                logger.warning(f"No audio file, creating silent segment")
                 video_clip = ImageClip(temp_img_path, duration=duration)
             
             # Fades
@@ -164,14 +183,16 @@ class FreeVideoGenerator:
                 audio_path = os.path.join(self.temp_dir, f"h_{segment_count}.mp3")
                 temp_files.append(audio_path)
                 
-                if self.generate_audio(hook['text'], audio_path):
-                    clip = self.create_video_segment(
-                        hook['text'], audio_path, hook.get('duration', 5),
-                        bg_color=(40, 60, 120)
-                    )
-                    if clip:
-                        video_clips.append(clip)
-                        segment_count += 1
+                # Try to generate audio, but continue even if it fails
+                self.generate_audio(hook['text'], audio_path)
+                
+                clip = self.create_video_segment(
+                    hook['text'], audio_path, hook.get('duration', 5),
+                    bg_color=(40, 60, 120)
+                )
+                if clip:
+                    video_clips.append(clip)
+                    segment_count += 1
             
             # Main segments
             for i, segment in enumerate(script.get('segments', [])[:2]):
@@ -181,13 +202,15 @@ class FreeVideoGenerator:
                 audio_path = os.path.join(self.temp_dir, f"s_{i}.mp3")
                 temp_files.append(audio_path)
                 
-                if self.generate_audio(segment['text'], audio_path):
-                    clip = self.create_video_segment(
-                        segment['text'], audio_path, segment.get('duration', 10)
-                    )
-                    if clip:
-                        video_clips.append(clip)
-                        segment_count += 1
+                # Try to generate audio, but continue even if it fails
+                self.generate_audio(segment['text'], audio_path)
+                
+                clip = self.create_video_segment(
+                    segment['text'], audio_path, segment.get('duration', 10)
+                )
+                if clip:
+                    video_clips.append(clip)
+                    segment_count += 1
             
             # Export
             if video_clips:
