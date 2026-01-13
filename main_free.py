@@ -19,7 +19,12 @@ from content_research_free import FreeContentResearcher
 from video_generator_free import FreeVideoGenerator
 from logger import get_logger
 from scheduler import VideoScheduler
-from free_uploader import upload_to_transfer_sh
+try:
+    from email_delivery import send_video_email
+    EMAIL_AVAILABLE = True
+except ImportError:
+    EMAIL_AVAILABLE = False
+    logger.warning("Email delivery not available")
 
 def upload_to_transfer_sh(file_path: str, max_days: int = 14) -> str:
     """Upload with multiple fallback options"""
@@ -140,9 +145,23 @@ class FreeYouTubeTechAgent:
             
             logger.info(f"✅ Upload instructions created: {instructions_path}")
 
-            # Optional: deliver via transfer.sh if persistent disk is unavailable
+            # Optional: deliver via email or transfer.sh
             delivery_method = os.getenv("OUTPUT_DELIVERY", "local").lower()
-            if delivery_method == "transfer_sh":
+            
+            if delivery_method == "email":
+                logger.info("📧 Delivering files via email...")
+                if EMAIL_AVAILABLE:
+                    if send_video_email(video_path, instructions_path):
+                        logger.info("✅ Email sent successfully!")
+                        logger.info("📬 Check your inbox for the video!")
+                    else:
+                        logger.error("❌ Email delivery failed")
+                        logger.warning("💡 Video saved locally, check output folder")
+                else:
+                    logger.error("❌ Email delivery not configured")
+                    logger.info("💡 Install email_delivery.py to enable email delivery")
+            
+            elif delivery_method == "transfer_sh":
                 logger.info("🚚 Delivering files via transfer.sh (no disk required)...")
                 video_url = upload_to_transfer_sh(video_path)
                 instr_url = upload_to_transfer_sh(instructions_path)
@@ -163,6 +182,10 @@ class FreeYouTubeTechAgent:
                     logger.info(f"🔗 Video download URL: {video_url}")
                 if instr_url:
                     logger.info(f"🔗 Instructions download URL: {instr_url}")
+            
+            else:
+                logger.info("💾 Files saved locally (no remote delivery)")
+                logger.info("💡 Set OUTPUT_DELIVERY=email to enable email delivery")
             
             # Step 5: Cleanup old files
             self._cleanup_old_files()
