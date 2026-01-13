@@ -22,37 +22,52 @@ from scheduler import VideoScheduler
 from free_uploader import upload_to_transfer_sh
 
 def upload_to_transfer_sh(file_path: str, max_days: int = 14) -> str:
-    """Upload file to transfer.sh and return download URL"""
+    """Upload with multiple fallback options"""
     import requests
     
-    try:
-        if not os.path.exists(file_path):
-            logger.error(f"File not found: {file_path}")
-            return None
-        
-        filename = os.path.basename(file_path)
-        
-        with open(file_path, 'rb') as f:
-            headers = {'Max-Days': str(max_days)}
-            logger.info(f"📤 Uploading {filename}...")
-            
-            response = requests.put(
-                f"https://transfer.sh/{filename}",
-                data=f,
-                headers=headers
-            )
-            
-            if response.status_code == 200:
-                download_url = response.text.strip()
-                logger.info(f"✅ Download URL: {download_url}")
-                return download_url
-            else:
-                logger.error(f"Upload failed: {response.status_code}")
-                return None
-                
-    except Exception as e:
-        logger.error(f"Upload error: {e}")
+    if not os.path.exists(file_path):
         return None
+    
+    filename = os.path.basename(file_path)
+    
+    # Try 1: file.io (most reliable)
+    try:
+        logger.info(f"📤 Uploading {filename} to file.io...")
+        with open(file_path, 'rb') as f:
+            response = requests.post(
+                'https://file.io',
+                files={'file': (filename, f)},
+                data={'expires': '14d'},
+                timeout=30
+            )
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    url = result.get('link')
+                    logger.info(f"✅ file.io URL: {url}")
+                    logger.info("⚠️ One-time download only!")
+                    return url
+    except Exception as e:
+        logger.warning(f"file.io failed: {e}")
+    
+    # Try 2: 0x0.st
+    try:
+        logger.info(f"📤 Trying 0x0.st...")
+        with open(file_path, 'rb') as f:
+            response = requests.post(
+                'https://0x0.st',
+                files={'file': (filename, f)},
+                timeout=30
+            )
+            if response.status_code == 200:
+                url = response.text.strip()
+                logger.info(f"✅ 0x0.st URL: {url}")
+                return url
+    except Exception as e:
+        logger.warning(f"0x0.st failed: {e}")
+    
+    logger.error("All upload services failed")
+    return None
 logger = get_logger(__name__)
 
 class FreeYouTubeTechAgent:
