@@ -21,6 +21,38 @@ from logger import get_logger
 from scheduler import VideoScheduler
 from free_uploader import upload_to_transfer_sh
 
+def upload_to_transfer_sh(file_path: str, max_days: int = 14) -> str:
+    """Upload file to transfer.sh and return download URL"""
+    import requests
+    
+    try:
+        if not os.path.exists(file_path):
+            logger.error(f"File not found: {file_path}")
+            return None
+        
+        filename = os.path.basename(file_path)
+        
+        with open(file_path, 'rb') as f:
+            headers = {'Max-Days': str(max_days)}
+            logger.info(f"📤 Uploading {filename}...")
+            
+            response = requests.put(
+                f"https://transfer.sh/{filename}",
+                data=f,
+                headers=headers
+            )
+            
+            if response.status_code == 200:
+                download_url = response.text.strip()
+                logger.info(f"✅ Download URL: {download_url}")
+                return download_url
+            else:
+                logger.error(f"Upload failed: {response.status_code}")
+                return None
+                
+    except Exception as e:
+        logger.error(f"Upload error: {e}")
+        return None
 logger = get_logger(__name__)
 
 class FreeYouTubeTechAgent:
